@@ -11,24 +11,28 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
 
-ACTOR_ID = "apify~website-content-crawler"
+# Actor جدید مخصوص گرفتن اسکرین‌شات از سایت
+ACTOR_ID = "apify~screenshot" 
 CHECK_INTERVAL = 3 * 60 * 60  # هر ۳ ساعت
 
 def get_dollar_screenshot():
     url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/run-sync-get-dataset-items"
     params = {"token": APIFY_TOKEN}
+    
     payload = {
-        "startUrls": [{"url": "https://www.tgju.org/profile/price_dollar_rl"}],
-        "maxPagesPerCrawl": 1,
-        "screenshot": True,
-        "headless": True
+        "url": "https://www.tgju.org/profile/price_dollar_rl",
+        "waitUntil": "networkidle2",
+        "fullPage": False,
+        "type": "jpeg"
     }
+    
     try:
         r = requests.post(url, params=params, json=payload, timeout=180)
         r.raise_for_status()
         items = r.json()
         if items and len(items) > 0:
-            return items[0].get("screenshotUrl") or items[0].get("url")
+            # این Actor لینک عکس رو توی کلید "url" برمی‌گردونه
+            return items[0].get("url") 
         return None
     except Exception as e:
         print(f"Apify error: {e}")
@@ -36,7 +40,7 @@ def get_dollar_screenshot():
 
 def send_telegram_photo(image_url, caption):
     try:
-        # ۱. دانلود عکس از لینک Apify
+        # ۱. دانلود عکس
         img_res = requests.get(image_url, timeout=30)
         img_res.raise_for_status()
         
