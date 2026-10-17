@@ -12,12 +12,17 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 CHECK_INTERVAL = 30 * 60
 
 def get_dollar_price():
-    url = "https://api.priceto.day/v1/latest/irr/usd"
+    # API جدید: navasan.tech (قیمت دلار آزاد)
+    url = "https://api.navasan.tech/latest/?api_key=free"
     try:
         r = requests.get(url, timeout=30)
         r.raise_for_status()
         data = r.json()
-        return data.get("price")
+        # ساختار خروجی این API معمولاً شامل کلید usd_sell یا usd هست
+        price = data.get("usd_sell") or data.get("usd")
+        if price:
+            return float(price)
+        return None
     except Exception as e:
         print(f"API error: {e}")
         return None
@@ -39,7 +44,8 @@ def check_and_send():
         print("No price data")
         return
 
-    price_toman = price_rial / 10
+    # قیمت این API معمولاً به تومان هست، ولی اگه ریال بود تقسیم بر 10 کن
+    price_toman = price_rial / 10 if price_rial > 100000 else price_rial
 
     msg = (
         f"💰 <b>قیمت دلار آزاد ایران</b>\n\n"
