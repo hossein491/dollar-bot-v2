@@ -8,52 +8,63 @@ app = Flask(__name__)
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
 
-CHECK_INTERVAL = 30 * 60
+# Actor مخصوص گرفتن عکس از سایت‌ها
+ACTOR_ID = "apify~website-content-crawler" 
+CHECK_INTERVAL = 30 * 60  # هر ۳۰ دقیقه
 
-def get_dollar_price():
-    # API جدید: navasan.tech (قیمت دلار آزاد)
-    url = "https://api.navasan.tech/latest/?api_key=free"
+def get_dollar_screenshot():
+    """گرفتن عکس از سایت قیمت دلار با Apify"""
+    url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/run-sync-get-dataset-items"
+    params = {"token": APIFY_TOKEN}
+    
+    # تنظیمات برای گرفتن اسکرین‌شات از سایت
+    payload = {
+        "startUrls": [{"url": "https://www.tgju.org/profile/price_dollar_rl"}],
+        "maxPagesPerCrawl": 1,
+        "screenshot": True,
+        "headless": True
+    }
+    
     try:
-        r = requests.get(url, timeout=30)
+        r = requests.post(url, params=params, json=payload, timeout=180)
         r.raise_for_status()
-        data = r.json()
-        # ساختار خروجی این API معمولاً شامل کلید usd_sell یا usd هست
-        price = data.get("usd_sell") or data.get("usd")
-        if price:
-            return float(price)
+        items = r.json()
+        if items and len(items) > 0:
+            # پیدا کردن لینک عکس در خروجی
+            return items[0].get("screenshotUrl") or items[0].get("url")
         return None
     except Exception as e:
-        print(f"API error: {e}")
+        print(f"Apify error: {e}")
         return None
 
-def send_telegram(text):
+def send_telegram_photo(image_url, caption):
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
         requests.post(url, json={
             "chat_id": TELEGRAM_CHAT_ID,
-            "text": text,
+            "photo": image_url,
+            "caption": caption,
             "parse_mode": "HTML"
-        }, timeout=10)
+        }, timeout=30)
     except Exception as e:
         print(f"Telegram error: {e}")
 
 def check_and_send():
-    price_rial = get_dollar_price()
-    if price_rial is None:
-        print("No price data")
+    print("Checking dollar price...")
+    image_url = get_dollar_screenshot()
+    
+    if not image_url:
+        print("No image found")
         return
-
-    # قیمت این API معمولاً به تومان هست، ولی اگه ریال بود تقسیم بر 10 کن
-    price_toman = price_rial / 10 if price_rial > 100000 else price_rial
-
-    msg = (
+    
+    caption = (
         f"💰 <b>قیمت دلار آزاد ایران</b>\n\n"
-        f"💵 <b>{price_toman:,.0f} تومان</b>\n\n"
         f"🕐 آخرین به‌روزرسانی: هر ۳۰ دقیقه"
     )
-    send_telegram(msg)
-    print(f"Price sent: {price_toman:,.0f} Toman")
+    send_telegram_photo(image_url, caption)
+    print("Photo sent!")
 
 def background_worker():
     time.sleep(10)
