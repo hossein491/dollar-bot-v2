@@ -3,6 +3,7 @@ import requests
 from flask import Flask
 import threading
 import time
+from io import BytesIO
 
 app = Flask(__name__)
 
@@ -10,29 +11,23 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
 
-# Actor مخصوص گرفتن عکس از سایت‌ها
-ACTOR_ID = "apify~website-content-crawler" 
-CHECK_INTERVAL = 30 * 60  # هر ۳۰ دقیقه
+ACTOR_ID = "apify~website-content-crawler"
+CHECK_INTERVAL = 60 * 60  # هر ۱ ساعت (برای اینکه اعتبار Apify تا آخر ماه دوام بیاره)
 
 def get_dollar_screenshot():
-    """گرفتن عکس از سایت قیمت دلار با Apify"""
     url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/run-sync-get-dataset-items"
     params = {"token": APIFY_TOKEN}
-    
-    # تنظیمات برای گرفتن اسکرین‌شات از سایت
     payload = {
         "startUrls": [{"url": "https://www.tgju.org/profile/price_dollar_rl"}],
         "maxPagesPerCrawl": 1,
         "screenshot": True,
         "headless": True
     }
-    
     try:
         r = requests.post(url, params=params, json=payload, timeout=180)
         r.raise_for_status()
         items = r.json()
         if items and len(items) > 0:
-            # پیدا کردن لینک عکس در خروجی
             return items[0].get("screenshotUrl") or items[0].get("url")
         return None
     except Exception as e:
@@ -41,15 +36,18 @@ def get_dollar_screenshot():
 
 def send_telegram_photo(image_url, caption):
     try:
+        # ۱. دانلود عکس
+        img_res = requests.get(image_url, timeout=30)
+        img_res.raise_for_status()
+        
+        # ۲. آپلود عکس به تلگرام
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
-        requests.post(url, json={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "photo": image_url,
-            "caption": caption,
-            "parse_mode": "HTML"
-        }, timeout=30)
+        files = {'photo': ('image.jpg', BytesIO(img_res.content), 'image/jpeg')}
+        data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption, 'parse_mode': 'HTML'}
+        
+        requests.post(url, files=files, data=data, timeout=30)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print(f"Telegram photo error: {e}")
 
 def check_and_send():
     print("Checking dollar price...")
@@ -61,7 +59,7 @@ def check_and_send():
     
     caption = (
         f"💰 <b>قیمت دلار آزاد ایران</b>\n\n"
-        f"🕐 آخرین به‌روزرسانی: هر ۳۰ دقیقه"
+        f"🕐 آخرین به‌روزرسانی: هر ۱ ساعت"
     )
     send_telegram_photo(image_url, caption)
     print("Photo sent!")
