@@ -11,8 +11,8 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
 
-# Actor جدید مخصوص گرفتن اسکرین‌شات از سایت
-ACTOR_ID = "apify~screenshot" 
+# Actor معتبر برای گرفتن اسکرین‌شات
+ACTOR_ID = "brunofin~website-screenshot-api"
 CHECK_INTERVAL = 3 * 60 * 60  # هر ۳ ساعت
 
 def get_dollar_screenshot():
@@ -20,10 +20,7 @@ def get_dollar_screenshot():
     params = {"token": APIFY_TOKEN}
     
     payload = {
-        "url": "https://www.tgju.org/profile/price_dollar_rl",
-        "waitUntil": "networkidle2",
-        "fullPage": False,
-        "type": "jpeg"
+        "url": "https://www.tgju.org/profile/price_dollar_rl"
     }
     
     try:
@@ -31,8 +28,8 @@ def get_dollar_screenshot():
         r.raise_for_status()
         items = r.json()
         if items and len(items) > 0:
-            # این Actor لینک عکس رو توی کلید "url" برمی‌گردونه
-            return items[0].get("url") 
+            # این Actor لینک عکس رو توی کلید "url" یا "screenshotUrl" برمی‌گردونه
+            return items[0].get("screenshotUrl") or items[0].get("url")
         return None
     except Exception as e:
         print(f"Apify error: {e}")
