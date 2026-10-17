@@ -12,7 +12,7 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 APIFY_TOKEN = os.environ.get("APIFY_TOKEN")
 
 ACTOR_ID = "apify~website-content-crawler"
-CHECK_INTERVAL = 60 * 60  # هر ۱ ساعت (برای اینکه اعتبار Apify تا آخر ماه دوام بیاره)
+CHECK_INTERVAL = 3 * 60 * 60  # هر ۳ ساعت
 
 def get_dollar_screenshot():
     url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/run-sync-get-dataset-items"
@@ -36,7 +36,7 @@ def get_dollar_screenshot():
 
 def send_telegram_photo(image_url, caption):
     try:
-        # ۱. دانلود عکس
+        # ۱. دانلود عکس از لینک Apify
         img_res = requests.get(image_url, timeout=30)
         img_res.raise_for_status()
         
@@ -45,7 +45,8 @@ def send_telegram_photo(image_url, caption):
         files = {'photo': ('image.jpg', BytesIO(img_res.content), 'image/jpeg')}
         data = {'chat_id': TELEGRAM_CHAT_ID, 'caption': caption, 'parse_mode': 'HTML'}
         
-        requests.post(url, files=files, data=data, timeout=30)
+        tg_res = requests.post(url, files=files, data=data, timeout=30)
+        print(f"Telegram response: {tg_res.status_code}")
     except Exception as e:
         print(f"Telegram photo error: {e}")
 
@@ -59,7 +60,7 @@ def check_and_send():
     
     caption = (
         f"💰 <b>قیمت دلار آزاد ایران</b>\n\n"
-        f"🕐 آخرین به‌روزرسانی: هر ۱ ساعت"
+        f"🕐 آخرین به‌روزرسانی: هر ۳ ساعت"
     )
     send_telegram_photo(image_url, caption)
     print("Photo sent!")
